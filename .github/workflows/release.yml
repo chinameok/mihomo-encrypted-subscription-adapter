@@ -98,4 +98,5 @@ jobs:
         run: |
           tag="$GITHUB_REF_NAME"
           if [ "${{ github.event_name }}" = workflow_dispatch ]; then tag="${{ inputs.tag }}"; fi
-          gh release create "$tag" dist/*             --repo "$GITHUB_REPOSITORY"             --title "$tag"             --verify-tag             --generate-notes
+          files=(dist/*.tar.gz dist/*.tar.gz.sha256)
+          gh release create "$tag" "${files[@]}"             --repo "$GITHUB_REPOSITORY"             --title "$tag"             --verify-tag             --generate-notes
