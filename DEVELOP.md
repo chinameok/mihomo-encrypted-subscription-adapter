@@ -6,7 +6,8 @@ repository.
 
 ## Prerequisites
 
-- Go version declared by go.mod (CI uses that module version).
+- Go 1.22 or newer for local development. CI and release builds pin Go
+  1.26.10 so the vulnerability scan uses a patched standard library.
 - Git and a working shell.
 - Optional: mise or another local tool version manager.
 
