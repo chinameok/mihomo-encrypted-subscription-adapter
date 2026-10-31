@@ -1,0 +1,37 @@
+name: Bug report
+description: Report a reproducible defect without sharing credentials.
+title: "bug: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include subscription URLs, passwords, decrypted providers, VPN
+        profiles, private keys, or secret-bearing logs. Use synthetic values.
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      placeholder: v0.1.0 or a short commit SHA
+    validations:
+      required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: Describe the observed behavior and the expected behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction
+      description: Use synthetic input or a local fake endpoint only.
+    validations:
+      required: true
+  - type: textarea
+    id: checks
+    attributes:
+      label: Checks and logs
+      description: Include redacted command output. Do not attach real provider data.

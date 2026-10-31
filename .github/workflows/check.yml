@@ -1,0 +1,99 @@
+name: Check
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: check-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Go checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Verify formatting
+        shell: bash
+        run: |
+          files="$(gofmt -l .)"
+          test -z "$files" || { echo "gofmt required:"; echo "$files"; exit 1; }
+
+      - name: Verify modules
+        run: go mod verify
+
+      - name: Unit tests
+        run: go test -count=1 ./...
+
+      - name: Race tests
+        run: go test -race ./...
+
+      - name: Fuzz smoke
+        run: go test ./internal/decrypt -run=^$ -fuzz=Fuzz -fuzztime=10s
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.4.4
+
+      - name: Vulnerability check
+        run: govulncheck ./...
+
+      - name: Credential-shaped string check
+        shell: bash
+        run: |
+          if git grep -n -I -E 'AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9_]{20,}' -- . ':!go.sum'; then
+            echo "credential-shaped text found; remove it or use a clearly synthetic marker"
+            exit 1
+          fi
+
+  cross-build:
+    name: Cross-build ${{ matrix.goos }}/${{ matrix.goarch }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: darwin
+            goarch: arm64
+          - goos: linux
+            goarch: amd64
+          - goos: windows
+            goarch: amd64
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0
+        run: |
+          suffix=""
+          if [ "$GOOS" = windows ]; then suffix=".exe"; fi
+          mkdir -p dist
+          go build -trimpath -buildvcs=false             -o "dist/mihomo-subscription-adapter-$GOOS-$GOARCH$suffix"             ./cmd/mihomo-subscription-adapter

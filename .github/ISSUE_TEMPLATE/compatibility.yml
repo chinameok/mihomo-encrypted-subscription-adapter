@@ -1,0 +1,37 @@
+name: Compatibility report
+description: Report behavior with a synthetic or redacted provider profile.
+title: "compat: "
+labels:
+  - compatibility
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use only synthetic or fully redacted data. Supplier credentials and
+        decrypted node lists must be reported privately, never here.
+  - type: input
+    id: adapter-version
+    attributes:
+      label: Adapter version or commit
+    validations:
+      required: true
+  - type: input
+    id: mihomo-version
+    attributes:
+      label: Mihomo version
+    validations:
+      required: true
+  - type: textarea
+    id: response-shape
+    attributes:
+      label: Redacted response shape
+      description: Headers and sizes are useful; remove URLs, tokens, and payloads.
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: Result
+      description: State whether this reached decrypt_validated or provider_refreshed.
+    validations:
+      required: true

@@ -1,0 +1,38 @@
+# Build output
+/dist/
+/bin/
+*.exe
+*.app
+
+# Go tooling
+*.test
+cover.out
+coverage.out
+vendor/
+
+# Local fixtures and runtime state (never commit real providers)
+.env
+.env.*
+*.provider.yaml
+*.provider.yml
+provider.yaml
+provider.previous.yaml
+status.json
+refresh.lock
+disabled
+password
+url
+*.subscription
+*.secret
+*.key
+*.crt
+*.log
+
+# Editor and OS files
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Fuzz output
+testdata/fuzz/*
