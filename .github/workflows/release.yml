@@ -23,6 +23,10 @@ jobs:
     name: Build ${{ matrix.goos }}/${{ matrix.goarch }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
     strategy:
       fail-fast: false
       matrix:
@@ -62,6 +66,11 @@ jobs:
           tar -C dist/stage -czf "dist/$binary-$version.tar.gz" "$binary"
           (cd dist && sha256sum "$binary-$version.tar.gz" > "$binary-$version.tar.gz.sha256")
 
+      - name: Attest release archive
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist/*.tar.gz
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -89,4 +98,4 @@ jobs:
         run: |
           tag="$GITHUB_REF_NAME"
           if [ "${{ github.event_name }}" = workflow_dispatch ]; then tag="${{ inputs.tag }}"; fi
-          gh release create "$tag" dist/*             --repo "$GITHUB_REPOSITORY"             --title "$tag"             --generate-notes
+          gh release create "$tag" dist/*             --repo "$GITHUB_REPOSITORY"             --title "$tag"             --verify-tag             --generate-notes
