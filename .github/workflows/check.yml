@@ -50,7 +50,7 @@ jobs:
         run: go vet ./...
 
       - name: Install govulncheck
-        run: go install golang.org/x/vuln/cmd/govulncheck@v1.4.4
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
 
       - name: Vulnerability check
         run: govulncheck ./...
