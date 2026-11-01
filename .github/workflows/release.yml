@@ -6,9 +6,14 @@ on:
       - v*.*.*
   workflow_dispatch:
     inputs:
-      tag:
-        description: Existing tag to release
+      publish:
+        description: Publish a formal release after verification
         required: true
+        default: false
+        type: boolean
+      tag:
+        description: Existing vMAJOR.MINOR.PATCH tag (also select that tag as the workflow ref)
+        required: false
         type: string
 
 permissions:
@@ -19,8 +24,70 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  prepare:
+    name: Select release source
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      source-sha: ${{ steps.source.outputs.sha }}
+      source-ref: ${{ steps.source.outputs.ref }}
+      version: ${{ steps.source.outputs.version }}
+      publish: ${{ steps.source.outputs.publish }}
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Resolve source and publishing mode
+        id: source
+        env:
+          RELEASE_EVENT: ${{ github.event_name }}
+          REQUESTED_TAG: ${{ inputs.tag }}
+          REQUESTED_PUBLISH: ${{ inputs.publish }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="$REQUESTED_TAG"
+          publish=false
+          if [[ "$RELEASE_EVENT" == push ]]; then
+            tag="$GITHUB_REF_NAME"
+            publish=true
+          elif [[ "$REQUESTED_PUBLISH" == true ]]; then
+            publish=true
+          fi
+          if [[ "$publish" == true && -z "$tag" ]]; then
+            echo 'Publishing requires an existing vMAJOR.MINOR.PATCH tag.' >&2
+            exit 1
+          fi
+          sha="$GITHUB_SHA"
+          ref="$GITHUB_REF"
+          version="validation-${sha:0:12}"
+          if [[ -n "$tag" ]]; then
+            if [[ ! "$tag" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+              echo 'Invalid tag: expected vMAJOR.MINOR.PATCH.' >&2
+              exit 1
+            fi
+            sha="$(git rev-parse --verify "refs/tags/$tag^{commit}")"
+            ref="refs/tags/$tag"
+            # Provenance binds to the workflow ref, not an arbitrary checkout.
+            if [[ "$GITHUB_REF" != "$ref" || "$GITHUB_SHA" != "$sha" ]]; then
+              echo 'Select the requested tag as the workflow ref (--ref TAG).' >&2
+              exit 1
+            fi
+            version="$tag"
+          fi
+          {
+            echo "sha=$sha"
+            echo "ref=$ref"
+            echo "version=$version"
+            echo "publish=$publish"
+          } >> "$GITHUB_OUTPUT"
+
   build:
     name: Build ${{ matrix.goos }}/${{ matrix.goarch }}
+    needs: prepare
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -41,7 +108,8 @@ jobs:
       - name: Check out
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.tag || github.ref }}
+          ref: ${{ needs.prepare.outputs.source-sha }}
+          persist-credentials: false
 
       - name: Set up Go
         uses: actions/setup-go@v7
@@ -54,17 +122,19 @@ jobs:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: 0
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
         shell: bash
         run: |
-          version="$GITHUB_REF_NAME"
-          if [ "${{ github.event_name }}" = workflow_dispatch ]; then version="${{ inputs.tag }}"; fi
+          set -euo pipefail
           suffix=""
           if [ "$GOOS" = windows ]; then suffix=".exe"; fi
           mkdir -p dist/stage
           binary="mihomo-subscription-adapter-$GOOS-$GOARCH$suffix"
-          go build -trimpath -buildvcs=false             -ldflags "-s -w"             -o "dist/stage/$binary" ./cmd/mihomo-subscription-adapter
-          tar -C dist/stage -czf "dist/$binary-$version.tar.gz" "$binary"
-          (cd dist && sha256sum "$binary-$version.tar.gz" > "$binary-$version.tar.gz.sha256")
+          go build -trimpath -buildvcs=false \
+            -ldflags "-s -w" \
+            -o "dist/stage/$binary" ./cmd/mihomo-subscription-adapter
+          tar -C dist/stage -czf "dist/$binary-$RELEASE_VERSION.tar.gz" "$binary"
+          (cd dist && sha256sum "$binary-$RELEASE_VERSION.tar.gz" > "$binary-$RELEASE_VERSION.tar.gz.sha256")
 
       - name: Attest release archive
         uses: actions/attest-build-provenance@v2
@@ -75,11 +145,63 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: release-${{ matrix.goos }}-${{ matrix.goarch }}
-          path: dist/*
+          path: |
+            dist/*.tar.gz
+            dist/*.tar.gz.sha256
+          if-no-files-found: error
+          retention-days: 7
+
+  verify:
+    name: Verify release artifacts
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      attestations: read
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.source-sha }}
+          persist-credentials: false
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: dist
+          merge-multiple: true
+
+      - name: Test package verifier
+        run: python3 -B -m unittest discover -s scripts -p 'test_*.py'
+
+      - name: Verify package set, contents, and checksums
+        env:
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+        run: python3 scripts/verify-release-artifacts.py dist "$RELEASE_VERSION"
+
+      - name: Verify GitHub build provenance
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ needs.prepare.outputs.source-sha }}
+          SOURCE_REF: ${{ needs.prepare.outputs.source-ref }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for archive in dist/*.tar.gz; do
+            gh attestation verify "$archive" \
+              --repo "$GITHUB_REPOSITORY" \
+              --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release.yml" \
+              --source-digest "$SOURCE_SHA" \
+              --source-ref "$SOURCE_REF" \
+              --deny-self-hosted-runners
+          done
 
   publish:
     name: Publish GitHub release
-    needs: build
+    if: needs.prepare.outputs.publish == 'true'
+    needs: [prepare, verify]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -95,8 +217,13 @@ jobs:
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.version }}
+        shell: bash
         run: |
-          tag="$GITHUB_REF_NAME"
-          if [ "${{ github.event_name }}" = workflow_dispatch ]; then tag="${{ inputs.tag }}"; fi
+          set -euo pipefail
           files=(dist/*.tar.gz dist/*.tar.gz.sha256)
-          gh release create "$tag" "${files[@]}"             --repo "$GITHUB_REPOSITORY"             --title "$tag"             --verify-tag             --generate-notes
+          gh release create "$RELEASE_TAG" "${files[@]}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$RELEASE_TAG" \
+            --verify-tag \
+            --generate-notes
