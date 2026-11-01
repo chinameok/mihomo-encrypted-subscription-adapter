@@ -137,7 +137,7 @@ jobs:
           (cd dist && sha256sum "$binary-$RELEASE_VERSION.tar.gz" > "$binary-$RELEASE_VERSION.tar.gz.sha256")
 
       - name: Attest release archive
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: dist/*.tar.gz
 
