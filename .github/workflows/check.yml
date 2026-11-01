@@ -97,3 +97,10 @@ jobs:
           if [ "$GOOS" = windows ]; then suffix=".exe"; fi
           mkdir -p dist
           go build -trimpath -buildvcs=false             -o "dist/mihomo-subscription-adapter-$GOOS-$GOARCH$suffix"             ./cmd/mihomo-subscription-adapter
+
+      - name: Upload cross-build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: check-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: dist/*
+          retention-days: 7

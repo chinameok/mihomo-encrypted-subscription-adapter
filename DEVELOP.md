@@ -100,9 +100,14 @@ credential handling, provider output, or release artifacts.
 
 ## Cross-builds and release artifacts
 
-The release workflow builds the CLI with -trimpath -buildvcs=false for the
-supported matrix and emits SHA-256 checksum files. A local equivalent for the
-primary target is:
+The check workflow builds the supported matrix and uploads seven-day artifacts
+for maintainer testing. The release workflow builds the CLI with
+`-trimpath -buildvcs=false` from the pushed version tag, emits SHA-256 checksum
+files, and publishes GitHub build provenance for each archive. A tagged CI
+release artifact is the preferred input for the Mac canary; it keeps the
+installed binary tied to a reviewed source tag and the workflow evidence.
+
+A local equivalent for the primary target is:
 
 ~~~bash
 CGO_ENABLED=0 GOOS=darwin GOARCH=arm64   go build -trimpath -buildvcs=false   -o dist/mihomo-subscription-adapter-darwin-arm64   ./cmd/mihomo-subscription-adapter
@@ -112,6 +117,18 @@ Do not claim that a cross-build is a Mac runtime acceptance. Real Keychain,
 launchd, Mihomo controller, and traffic checks require the authorized Mac
 procedure described by the private deployment runbook.
 
+To publish a release, first merge the reviewed change, create an annotated
+semantic version tag, and push that tag. The tag push starts the release
+workflow; no supplier URL, password, provider, or VPN material is needed:
+
+~~~bash
+git tag -a v0.1.0 -m "release v0.1.0"
+git push origin v0.1.0
+~~~
+
+The release job verifies that the tag exists before creating the GitHub
+Release. It does not run for ordinary local builds or `main` pushes.
+
 ## Versioning and dependency updates
 
 Tags use vMAJOR.MINOR.PATCH. Before 1.0, compatibility may change between
@@ -119,8 +136,9 @@ minor versions and the changelog must call that out. Dependabot is the only
 automated dependency updater; do not add Renovate or a second updater for the
 same ecosystems.
 
-Release notes are derived from Conventional Commit subjects and the curated
-CHANGELOG.md. A release contains source tag, binaries, checksums, and a note
+Release notes use GitHub's generated notes from the source tag and the curated
+CHANGELOG.md remains the human-maintained user-facing record. A release
+contains source tag, binaries, checksums, provenance attestations, and a note
 about signing/notarization status. No release job contacts a subscription
 endpoint.
 
