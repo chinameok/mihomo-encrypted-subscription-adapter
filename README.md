@@ -78,9 +78,13 @@ part of a routine refresh.
 
 Release artifacts are published on the [GitHub Releases page][releases].
 Download the artifact for your platform, verify its accompanying SHA-256
-checksum, and place the binary in a user-owned directory. The exact packaging
-and launchd integration are documented in [DEVELOP.md](DEVELOP.md) and the
-generic [macOS LaunchAgent template](packaging/macos/README.md).
+checksum, and place the binary in a user-owned directory. Tagged releases are
+built by GitHub Actions from the source tag; the release workflow also publishes
+GitHub build provenance for each archive. The exact packaging and launchd
+integration are documented in [DEVELOP.md](DEVELOP.md) and the generic
+[macOS LaunchAgent template](packaging/macos/README.md). Successful `main` and
+pull-request checks also expose short-lived cross-build artifacts for
+maintainer testing; those artifacts are not releases.
 
 The safe command contract is:
 
@@ -139,7 +143,10 @@ go mod verify
 
 Tests must use synthetic encrypted payloads and `httptest`; live subscription
 URLs are prohibited. The CI workflow also runs a short fuzz smoke test,
-`govulncheck`, secret-pattern checks, and cross-builds.
+`govulncheck`, secret-pattern checks, and cross-builds. It uploads those
+cross-builds as seven-day testing artifacts. A local build is useful for
+development only; the Mac canary should consume a tagged GitHub Actions
+release artifact after its checksum and provenance have been reviewed.
 
 ## Project governance
 
@@ -150,9 +157,10 @@ URLs are prohibited. The CI workflow also runs a short fuzz smoke test,
 - [CHANGELOG.md](CHANGELOG.md) records user-visible changes.
 
 This project uses Conventional Commit subjects and squash merges. Tagged
-releases are built from source, include checksums, and state whether signing or
-notarization is available. Checksums detect download corruption; they do not
-prove a build's provenance.
+releases are built from source, include checksums and GitHub build provenance,
+and state whether signing or notarization is available. Checksums detect
+download corruption; provenance records the GitHub Actions build identity but
+does not replace Mac code signing or notarization.
 
 ## License
 
