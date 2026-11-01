@@ -20,10 +20,10 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Check out
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version: '1.26.10'
           cache: true
@@ -79,10 +79,10 @@ jobs:
             goarch: amd64
     steps:
       - name: Check out
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version: '1.26.10'
           cache: true
@@ -99,7 +99,7 @@ jobs:
           go build -trimpath -buildvcs=false             -o "dist/mihomo-subscription-adapter-$GOOS-$GOARCH$suffix"             ./cmd/mihomo-subscription-adapter
 
       - name: Upload cross-build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: check-${{ matrix.goos }}-${{ matrix.goarch }}
           path: dist/*
