@@ -8,11 +8,14 @@ published on GitHub.
 
 ### Added
 
-- Future changes go here.
+- Manual release validation for all three platform archives, checksums, and
+  GitHub provenance, with publishing disabled by default.
 
 ### Changed
 
-- No changes yet.
+- Release publishing now requires package and provenance verification and an
+  unambiguous existing version tag. Validation creates only Actions artifacts
+  and attestations, without creating a tag or formal release.
 
 ## [0.1.0] - 2026-10-31
 
