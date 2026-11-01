@@ -8,11 +8,22 @@ published on GitHub.
 
 ### Added
 
-- Public project contract and security boundary.
-- Synthetic-only contribution and acceptance policy.
+- Future changes go here.
 
 ### Changed
 
-- No stable runtime behavior has been promised yet.
+- No changes yet.
 
-[unreleased]: https://github.com/chinameok/mihomo-encrypted-subscription-adapter/compare/HEAD...HEAD
+## [0.1.0] - 2026-10-31
+
+### Added
+
+- Initial local adapter for FlClash-encrypted Clash/Mihomo subscriptions.
+- Bounded HTTPS fetch, AES-128-CBC/PKCS7 decryption, profile validation, and
+  atomic last-known-good provider updates.
+- Optional Mihomo controller refresh, protected local credentials, rollback,
+  status, disable/enable commands, and a macOS LaunchAgent template.
+- Public CI, cross-build and release workflows with checksums.
+
+[unreleased]: https://github.com/chinameok/mihomo-encrypted-subscription-adapter/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/chinameok/mihomo-encrypted-subscription-adapter/releases/tag/v0.1.0
