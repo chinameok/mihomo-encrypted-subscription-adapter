@@ -98,6 +98,13 @@ the user-visible behavior, tests run, security impact, and rollback path. A
 PR must state explicitly whether it changes the decryption contract,
 credential handling, provider output, or release artifacts.
 
+The `main` ruleset requires a pull request, resolved review conversations,
+and the latest base branch before merging. Required GitHub Actions checks are
+`Go checks`, `Cross-build darwin/arm64`, `Cross-build linux/amd64`, and
+`Cross-build windows/amd64`. Force pushes and deletion are blocked, with no
+bypass. A single maintainer can merge without a second approval; successful
+checks are still required.
+
 ## Cross-builds and release artifacts
 
 The check workflow builds the supported matrix and uploads seven-day artifacts
@@ -106,6 +113,38 @@ for maintainer testing. The release workflow builds the CLI with
 files, and publishes GitHub build provenance for each archive. A tagged CI
 release artifact is the preferred input for the Mac canary; it keeps the
 installed binary tied to a reviewed source tag and the workflow evidence.
+
+Both validation and publishing download the combined three-platform package
+set and verify the exact six files (three archives and three checksums). Each
+archive must contain only its correctly named, nonempty binary; Windows uses
+`.exe`. The verification job also checks GitHub provenance against this
+repository, `.github/workflows/release.yml`, and the selected source commit
+and ref. The publish job runs only after this verification succeeds.
+
+Before merging workflow or dependency changes, exercise the complete release
+path without creating a formal release:
+
+~~~bash
+gh workflow run release.yml --repo chinameok/mihomo-encrypted-subscription-adapter \
+  --ref YOUR_REVIEW_BRANCH -f publish=false
+gh run list --repo chinameok/mihomo-encrypted-subscription-adapter \
+  --workflow release.yml --branch YOUR_REVIEW_BRANCH --limit 1
+gh run watch RUN_ID --repo chinameok/mihomo-encrypted-subscription-adapter --exit-status
+~~~
+
+With no `tag` input, validation builds the exact commit selected by the
+workflow dispatch, with archive version `validation-SHORT_SHA`. This works for
+a review branch or `main`; it does not silently build a release tag. Manual
+runs default to `publish=false`. Validation still writes seven-day Actions
+artifacts and GitHub build provenance attestations, which are public in this
+public repository. It does not create or move Git tags, create a GitHub
+Release, contact a supplier, or install a binary on a user machine.
+
+The package verifier can be checked locally using synthetic fixtures:
+
+~~~bash
+python3 -B -m unittest discover -s scripts -p 'test_*.py'
+~~~
 
 A local equivalent for the primary target is:
 
@@ -128,6 +167,24 @@ git push origin v0.1.0
 
 The release job verifies that the tag exists before creating the GitHub
 Release. It does not run for ordinary local builds or `main` pushes.
+
+To manually validate or publish an existing tag, both the workflow ref and
+the `tag` input must name the same existing `vMAJOR.MINOR.PATCH` tag. This
+binds the provenance source revision to the actual code being built. For
+example, for a future tag containing this workflow:
+
+~~~bash
+gh workflow run release.yml --repo chinameok/mihomo-encrypted-subscription-adapter \
+  --ref v0.2.0 -f tag=v0.2.0 -f publish=false
+# Change publish=false to publish=true only when a formal release is intended.
+~~~
+
+Manual publishing rejects an absent/invalid tag, a missing tag, or a workflow
+ref that differs from the requested tag. It never interprets the tag input as
+an arbitrary branch name. Pushing a valid version tag continues to publish
+automatically after the same package and provenance checks. Re-running an
+already published tag does not overwrite its release. CI artifacts are build
+evidence; passing these checks alone does not require a runtime binary update.
 
 ## Versioning and dependency updates
 
